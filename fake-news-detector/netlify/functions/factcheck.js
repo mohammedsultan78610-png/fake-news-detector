@@ -8,7 +8,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'No claim provided' }) };
   }
 
-  // 1. Web search using SerpAPI (free tier, 100 searches/month)
+  // 1. Web search using SerpAPI
   const searchUrl = `https://serpapi.com/search.json?q=${encodeURIComponent(claim)}&api_key=${process.env.SERP_API_KEY}`;
   const searchRes = await fetch(searchUrl);
   const searchData = await searchRes.json();
@@ -31,17 +31,22 @@ exports.handler = async (event) => {
     link: r.link
   }));
 
-  // 2. AI fact-checking with Google Gemini
-  const prompt = `You are a professional fact-checker. Given the news claim and search result snippets below, determine if the claim is REAL, FAKE, or MISLEADING. Provide a one- or two-sentence explanation. Use only the search results; if unsure, say UNCERTAIN.
+  // 2. AI fact-checking with Google Gemini — improved prompt
+  const prompt = `You are a fact-checker. Analyze the news claim using ONLY the search snippets below. Return EXACTLY two lines in English, nothing else.
+
+Line 1 must be: VERDICT: REAL
+or: VERDICT: FAKE
+or: VERDICT: MISLEADING
+or: VERDICT: UNCERTAIN
+
+Line 2 must be: EXPLANATION: [one or two sentences]
+
+Do not include any other text, asterisks, or extra words. If the snippets are insufficient, return VERDICT: UNCERTAIN and an explanation about lacking evidence.
 
 Claim: ${claim}
 
 Search Snippets:
-${snippets}
-
-Respond in this exact format:
-VERDICT: [one word]
-EXPLANATION: [your explanation]`;
+${snippets}`;
 
   const geminiRes = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
