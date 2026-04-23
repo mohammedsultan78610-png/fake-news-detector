@@ -20,7 +20,8 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         verdict: 'UNCERTAIN',
         explanation: 'No relevant news articles found. Try a different claim.',
-        sources: []
+        sources: [],
+        raw: 'No search results.'
       })
     };
   }
@@ -31,7 +32,7 @@ exports.handler = async (event) => {
     link: r.link
   }));
 
-  // 2. AI fact-checking with Google Gemini — improved prompt
+  // 2. AI fact-checking with Google Gemini — strict prompt
   const prompt = `You are a fact-checker. Analyze the news claim using ONLY the search snippets below. Return EXACTLY two lines in English, nothing else.
 
 Line 1 must be: VERDICT: REAL
@@ -66,8 +67,9 @@ ${snippets}`;
   const verdict = verdictMatch ? verdictMatch[1].trim().toUpperCase() : 'UNCERTAIN';
   const explanation = explanationMatch ? explanationMatch[1].trim() : 'Could not determine explanation.';
 
+  // DEBUG: include raw AI text so we can see what Gemini actually said
   return {
     statusCode: 200,
-    body: JSON.stringify({ verdict, explanation, sources })
+    body: JSON.stringify({ verdict, explanation, sources, raw: aiText })
   };
 };
