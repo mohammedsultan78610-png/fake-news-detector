@@ -21,9 +21,7 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           verdict: 'UNCERTAIN',
           explanation: 'No relevant news articles found.',
-          sources: [],
-          raw: 'No search results',
-          rawGemini: ''
+          sources: []
         })
       };
     }
@@ -34,7 +32,7 @@ exports.handler = async (event) => {
       link: r.link
     }));
 
-    // 2. AI fact-check with Gemini
+    // 2. AI fact-checking using Groq (free, fast, reliable)
     const prompt = `You are a fact-checker. Analyze the news claim using ONLY the search snippets below. Return EXACTLY two lines in English, nothing else.
 
 Line 1 must be: VERDICT: REAL
@@ -51,18 +49,34 @@ Claim: ${claim}
 Search Snippets:
 ${snippets}`;
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1
+      })
+    });
+
+    const groqData = await groqRes.json();
+
+    // If Groq returned an error, show it
+    if (groqData.error) {
+      return {
+        statusCode: 200,
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
+          verdict: 'ERROR',
+          explanation: `Groq API error: ${groqData.error.message}`,
+          sources
         })
-      }
-    );
-    const geminiData = await geminiRes.json();
-    const aiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      };
+    }
+
+    const aiText = groqData.choices?.[0]?.message?.content || '';
 
     const verdictMatch = aiText.match(/VERDICT:\s*(.*)/i);
     const explanationMatch = aiText.match(/EXPLANATION:\s*(.*)/i);
@@ -71,13 +85,7 @@ ${snippets}`;
 
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        verdict,
-        explanation,
-        sources,
-        raw: aiText,
-        rawGemini: JSON.stringify(geminiData)
-      })
+      body: JSON.stringify({ verdict, explanation, sources })
     };
   } catch (error) {
     return {
@@ -85,9 +93,7 @@ ${snippets}`;
       body: JSON.stringify({
         verdict: 'ERROR',
         explanation: error.message,
-        sources: [],
-        raw: error.stack,
-        rawGemini: ''
+        sources: []
       })
     };
   }
