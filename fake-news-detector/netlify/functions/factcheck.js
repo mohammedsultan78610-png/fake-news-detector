@@ -8,8 +8,8 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'No claim provided' }) };
   }
 
-  // 1. Web search
   try {
+    // 1. Web search using SerpAPI
     const searchUrl = `https://serpapi.com/search.json?q=${encodeURIComponent(claim)}&api_key=${process.env.SERP_API_KEY}`;
     const searchRes = await fetch(searchUrl);
     const searchData = await searchRes.json();
@@ -22,7 +22,8 @@ exports.handler = async (event) => {
           verdict: 'UNCERTAIN',
           explanation: 'No relevant news articles found.',
           sources: [],
-          raw: 'No search results'
+          raw: 'No search results',
+          rawGemini: ''
         })
       };
     }
@@ -33,7 +34,7 @@ exports.handler = async (event) => {
       link: r.link
     }));
 
-    // 2. AI fact-check
+    // 2. AI fact-check with Gemini
     const prompt = `You are a fact-checker. Analyze the news claim using ONLY the search snippets below. Return EXACTLY two lines in English, nothing else.
 
 Line 1 must be: VERDICT: REAL
@@ -66,20 +67,27 @@ ${snippets}`;
     const verdictMatch = aiText.match(/VERDICT:\s*(.*)/i);
     const explanationMatch = aiText.match(/EXPLANATION:\s*(.*)/i);
     const verdict = verdictMatch ? verdictMatch[1].trim().toUpperCase() : 'UNCERTAIN';
-    const explanation = explanationMatch ? explanationMatch[1].trim() : 'Could not determine explanation.';
+    const explanation = explanationMatch ? explanationMatch[1].trim() : 'AI response was empty or malformed';
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ verdict, explanation, sources, raw: aiText })
+      body: JSON.stringify({
+        verdict,
+        explanation,
+        sources,
+        raw: aiText,
+        rawGemini: JSON.stringify(geminiData)
+      })
     };
   } catch (error) {
     return {
       statusCode: 200,
       body: JSON.stringify({
         verdict: 'ERROR',
-        explanation: 'Something went wrong with the API request.',
+        explanation: error.message,
         sources: [],
-        raw: error.message
+        raw: error.stack,
+        rawGemini: ''
       })
     };
   }
