@@ -71,6 +71,7 @@
           data.sources.forEach(s => html += `<li><a href="${s.link}" target="_blank">${s.title}</a></li>`);
           html += '</ul></div>';
         }
+        alert('RAW AI TEXT:\n' + (data.raw || 'undefined'));
         resultDiv.innerHTML = html;
       } catch (err) {
         resultDiv.innerHTML = '❌ Something went wrong. Please try again.';
